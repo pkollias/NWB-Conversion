@@ -1,0 +1,19 @@
+.idea/*
+__pycache__/*
+env/*
+Example Data/*
+PLX SDK/*
+PyPL2/*
+bin/*
+unused files/*
+brpylib.py
+brMiscFxns.py
+basic_test.py
+ecephys.py
+LB-0826-2.0 Python Offline Utilities IFU.pdf
+example_extract_continuous_data.py
+example_extract_spike_data.py
+example_save_subset_nsx.py
+pynwb/
+scrap_code.py
+test.py
