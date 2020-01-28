@@ -13,8 +13,8 @@ from pynwb.misc import IntervalSeries
 
 # File to import
 session_name = "Oscar_180508_001" # TODO: Fix the session name
-blk_file_name = "C:\\Users\\tbuschma\\OneDrive\\Documents\\Python Scripts\\NWB conversion\\Example Data\\" \
-                "Oscar 180508\\gatingwm_oscar_180508_001.ns6" # TODO: Fix the file location
+blk_file_name = "C:\\Users\\tbuschma\\OneDrive\\Documents\\Python Scripts\\NWB-Conversion\\Example Data\\" \
+                "Oscar 180508\\gatingwm_oscar_180508_001.ns6"  # TODO: Fix the file location
 
 
 #######################
@@ -78,13 +78,18 @@ NWBHelperFunctions.AddStimulusImageToNWB(nwb_file_name, stimulus_image_info, ver
 
 #######################
 ## Add raw electrophysiology data
-ConvertBlackrockToNWB.AddBlackrockRawDataToNWB(blk_file_name, nwb_file_name, elec_ids=[1,2])
+ConvertBlackrockToNWB.AddBlackrockRawDataToNWB(blk_file_name, nwb_file_name, elec_ids=[1, 2])
 
 
 #######################
 ## Add processed LFP data
 blk_lfp_file_name = path.splitext(blk_file_name)[0] + '.ns3'
 ConvertBlackrockToNWB.AddBlackrockLFPDataToNWB(blk_lfp_file_name, nwb_file_name, elec_ids=[1,2], verbose=True)
+
+
+#######################
+## Filter LFP data from raw signal (not needed for most blackrock recordings)
+# NWBAnalysisFunctions.NWBFilterLFP(nwb_file_name, signal_name='Raw Data for Channels [1, 2]', elec_ids=[1, 2], verbose=True)
 
 
 #######################
@@ -155,7 +160,7 @@ event_key_description = {'StageBitcodeIndex': '???',
 cond_key_description = {'GatingCond': '???',
                          'GatingCondSpecialized': '???',
                          'PostDistCategory': '???',
-                         #'StageIndex': '???', # -- TODO: Check to make sure we don't need this, this duplicates the one in events, right?
+                         #'StageIndex': '???', # -- TODO: Check to make sure we don't need this, this duplicates the one in events, right? Is that even needed?
                          'StageStimExtended': '???',
                          'StageStimSpecialized': '???'}
 

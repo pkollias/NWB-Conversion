@@ -1,6 +1,5 @@
 from os import getcwd, path
 import numpy as np
-from skimage import io
 from scipy.signal import savgol_filter
 
 import pynwb

@@ -44,11 +44,12 @@ def InitializeNWBFromBlackrock(blk_file_name, nwb_file_name='', experiment=None,
     # Check to see if valid nwb_file_name is passed
     if not nwb_file_name:
         nwb_file_name = path.splitext(blk_file_name)[0] + '.nwb'
-    if verbose: print("Writing to NWB data file %s" % (nwb_file_name))
+    if verbose: print("Writing to NWB data file: %s" % (nwb_file_name))
 
     # Initialize the Blackrock file
     try:
         # Requires the raw data to be imported
+        if verbose: print("Initializing read from Blackrock file: %s" % (blk_file_name))
         nsx_file = brpylib.NsxFile(blk_file_name)
     except:  # catch *all* exceptions
         e = sys.exc_info()[0]
@@ -308,11 +309,8 @@ def AddBlackrockRawDataToNWB(blk_file_name, nwb_file_name='', verbose=False, ele
     elec_table_ind = np.ones((len(elec_ids), 1)) * np.NaN
     for cur_elec_ind, cur_elec in enumerate(elec_ids):
         # In order to create electrode table, we have to have indexes for each channel into electrode list in NWB file
-        cur_elec_table_ind = 0
-        while (cur_elec_table_ind < len(nwb_file.electrodes)) and (
-                nwb_file.electrodes[cur_elec_table_ind, 0] != cur_elec):
-            cur_elec_table_ind = cur_elec_table_ind + 1
-        if cur_elec_table_ind >= len(nwb_file.electrodes):
+        cur_elec_table_ind = np.where(nwb_file.electrodes[:, 0] == cur_elec)[0]
+        if len(cur_elec_table_ind) == 0:
             raise ValueError("Couldn't find electrode %d in NWB file list." % (cur_elec))
         elec_table_ind[cur_elec_ind] = cur_elec_table_ind
     elec_table_ind = elec_table_ind.transpose().tolist()[0]  # Convert to list for create_electrode_table_region
@@ -432,11 +430,8 @@ def AddBlackrockLFPDataToNWB(blk_file_name, nwb_file_name='', verbose=False, ele
     elec_table_ind = np.ones((len(elec_ids), 1)) * np.NaN
     for cur_elec_ind, cur_elec in enumerate(elec_ids):
         # In order to create electrode table, we have to have indexes for each channel into electrode list in NWB file
-        cur_elec_table_ind = 0
-        while (cur_elec_table_ind < len(nwb_file.electrodes)) and (
-                nwb_file.electrodes[cur_elec_table_ind, 0] != cur_elec):
-            cur_elec_table_ind = cur_elec_table_ind + 1
-        if cur_elec_table_ind >= len(nwb_file.electrodes):
+        cur_elec_table_ind = np.where(nwb_file.electrodes[:, 0] == cur_elec)[0]
+        if len(cur_elec_table_ind) == 0:
             raise ValueError("Couldn't find electrode %d in NWB file list." % (cur_elec))
         elec_table_ind[cur_elec_ind] = cur_elec_table_ind
     elec_table_ind = elec_table_ind.transpose().tolist()[0]  # Convert to list for create_electrode_table_region
@@ -597,11 +592,8 @@ def AddBlackrockSpikeDataToNWB(blk_nev_file_name, nwb_file_name='', elec_ids=Non
         if verbose: print("\tWriting spike waveforms for electrode %d." % (cur_elec))
 
         # Create electrode table
-        cur_elec_table_ind = 0
-        while (cur_elec_table_ind < len(nwb_file.electrodes)) and (
-                nwb_file.electrodes[cur_elec_table_ind, 0] != cur_elec):
-            cur_elec_table_ind = cur_elec_table_ind + 1
-        if cur_elec_table_ind >= len(nwb_file.electrodes):
+        cur_elec_table_ind = np.where(nwb_file.electrodes[:, 0] == cur_elec)[0]
+        if len(cur_elec_table_ind) == 0:
             raise ValueError("Couldn't find electrode %d in NWB file list." % (cur_elec))
         electrode_table_region = nwb_file.create_electrode_table_region([cur_elec_table_ind],
                                                                         "Electrode %s" % (cur_elec))
