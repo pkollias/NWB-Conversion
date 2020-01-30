@@ -924,7 +924,7 @@ def AddBlackrockEyeDataToNWB(blk_file_name, nwb_file_name='', x_elec_id=None, y_
 
     # Create processing module for saving data
     if 'behavior' not in nwb_file.processing.keys():
-        if verbose: print("Behavior processing module does not exist. Creating." % (module_name))
+        if verbose: print("Behavior processing module does not exist. Creating.")
         signal_module = ProcessingModule(name='behavior',
                                          description="Processing module for behavior signals from %s." % (
                                              path.split(blk_file_name)[1]))

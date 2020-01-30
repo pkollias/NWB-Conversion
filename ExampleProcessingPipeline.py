@@ -3,6 +3,7 @@ import pandas
 from datetime import datetime
 from os import path
 import numpy as np
+import warnings
 
 from pynwb import ProcessingModule
 from pynwb.behavior import BehavioralEpochs
@@ -146,6 +147,13 @@ trial_key_description = {'TrialNum': 'The trial number in this session.',
                          'ReactionTime': 'Animal\'s reaction time, measured as the time (in ms) from cue onset to response.', #TODO: double check this!
                          'Cue': '???',
                          'Stim': '???',
+                         'StimOff': '???',
+                         'FixAcq': 'Time of fixation acquisition.',
+                         'FixBreak': 'Time of fixation break (if occurred).',
+                         'BarAcq': 'Time of bar holding.',
+                         'BarRelease': 'Time of bar release.',
+                         'RewardOn': 'Start of reward period.',
+                         'RewardOff': 'End of reward period.',
                          'StageNum': 'How many stages were in this trial.'}
 event_key_description = {'StageBitcodeIndex': '???',
                          'StageCategory': 'FixOnset, CueOnset, CueDelay, StimOnset, StimDelay, essentially unpacking of StageCode delay code, Nan for errors',
@@ -158,11 +166,11 @@ event_key_description = {'StageBitcodeIndex': '???',
                          'StageStimDelayCategory': 'CXX or SXX for stimulus preceding delay period, NaN for all other rows',
                          'StageTimeIndex': 'Final event raw signal timestamp to be used for analyses (either bitcode or extrapolated from encode). In ticks (so to convert to seconds, divide by sampling frequency)'}
 cond_key_description = {'GatingCond': '???',
-                         'GatingCondSpecialized': '???',
-                         'PostDistCategory': '???',
-                         #'StageIndex': '???', # -- TODO: Check to make sure we don't need this, this duplicates the one in events, right? Is that even needed?
-                         'StageStimExtended': '???',
-                         'StageStimSpecialized': '???'}
+                        'GatingCondSpecialized': '???',
+                        'PostDistCategory': '???',
+                        #'StageIndex': '???', # -- TODO: Check to make sure we don't need this, this duplicates the one in events, right? Is that even needed?
+                        'StageStimExtended': '???',
+                        'StageStimSpecialized': '???'}
 
 # Iterate through trials and extract information
 trial_data = []
@@ -170,16 +178,18 @@ for cur_trial_ind, cur_trial in trials_df.iterrows():
     # Take trial information from trials dataframe
     cur_trial_info = cur_trial[trial_key_description.keys()].to_dict()
     # Copy over the start and stop times
-    cur_trial_info['start_time'] = cur_trial['StartTime']/30000
-    cur_trial_info['stop_time'] = cur_trial['StopTime']/30000
+    cur_trial_info['start_time'] = cur_trial['StartTimeStamp']/30000
+    cur_trial_info['stop_time'] = cur_trial['EndTimeStamp']/30000
     # Also create list of events during this trial
     trial_events = events_df.query('TrialNum==%d' % (cur_trial['TrialNum']))
     for cur_key in event_key_description.keys():
-        cur_trial_info[cur_key] = trial_events[cur_key].to_list()
+        cur_key_data = trial_events[cur_key].to_list()
+        cur_trial_info[cur_key] = cur_key_data
     # Finally, create list of conditions during this trial
     trial_conds = conds_df.query('TrialNum==%d' % (cur_trial['TrialNum']))
     for cur_key in cond_key_description.keys():
-        cur_trial_info[cur_key] = trial_conds[cur_key].to_list()
+        cur_key_data = trial_conds[cur_key].to_list()
+        cur_trial_info[cur_key] = cur_key_data
     # Append to overall list
     trial_data.append(cur_trial_info)
 
@@ -190,7 +200,7 @@ NWBHelperFunctions.AddTrialDataToNWB(nwb_file_name, trial_data=trial_data, trial
 #######################
 ## Add stimulus epochs to file -- will track when something is on screen
 # Open NWB file for last additions
-[nwb_file, nwb_io] = NWBHelperFunctions.OpenNWBFile(nwb_file_name)
+nwb_file, nwb_io = NWBHelperFunctions.OpenNWBFile(nwb_file_name)
 
 # Define the sampling rate for the artificial signals
 sig_samp_freq = 30000
@@ -198,9 +208,22 @@ sig_samp_freq = 30000
 # Combine the events and conditions dataframes into one UBERFRAME
 uber_df = pandas.merge(events_df, conds_df)
 
+# The last stimulus doesn't have an offset, need to take it from the trials dataframe
+for cur_trial_ind, cur_trial in trials_df.iterrows():
+    # Find the last stimulus, its duration is end of trial from trials_df minus the start
+    trial_uber_ind = uber_df.index[uber_df['TrialNum'] == cur_trial['TrialNum']]
+    if len(trial_uber_ind) == 0:
+        continue
+    if np.isnan(uber_df.at[trial_uber_ind[-1], 'StageDuration']):
+        # Estimate from end of the stimulus sequence
+        uber_df.at[trial_uber_ind[-1], 'StageDuration'] = cur_trial['StimOff'] - uber_df.at[trial_uber_ind[-1], 'StageTimeIndex']
+    else:
+        print("Oops, something wrong with parsing the uber dataframe.  Expecting a NaN at the end of each trial, but this didn't occur for trial %d." % (cur_trial['TrialNum']))
+
+
 # Define information about all of the stimulus signals to create
 # TODO: Check the names of these are correct -- specifically the Cue/Stim labels and their associations
-stim_info = [{'name': 'Fixation (before cue)', 'GatingCondSpecialized': ['NaN'], 'StageStimCategory': ['FIX'], 'StageStimDelayCategory':['NODELAY']},
+stim_info = [{'name': 'Fixation (before cue)', 'GatingCondSpecialized': [], 'StageStimCategory': ['FIX'], 'StageStimDelayCategory':['NODELAY']},
              {'name': 'Cue 1 (Gate S11, S12)', 'GatingCondSpecialized': ['Cue'], 'StageStimCategory': ['C11'], 'StageStimDelayCategory':['NODELAY']},
              {'name': 'Cue 2 (Gate S11, S12)', 'GatingCondSpecialized': ['Cue'], 'StageStimCategory': ['C12'], 'StageStimDelayCategory':['NODELAY']},
              {'name': 'Cue 3 (Gate S21, S22)', 'GatingCondSpecialized': ['Cue'], 'StageStimCategory': ['C21'], 'StageStimDelayCategory':['NODELAY']},
@@ -252,6 +275,7 @@ stim_info = [{'name': 'Fixation (before cue)', 'GatingCondSpecialized': ['NaN'],
 
 # Make sure behavior module exists in the file -- it really should
 if 'behavior' not in nwb_file.processing.keys():
+    print("Adding behavior module...")
     signal_module = ProcessingModule(name='behavior', description="Processing module for behavior signals.")
     nwb_file.add_processing_module(signal_module)
 
@@ -260,21 +284,42 @@ stim_epoch_interface = BehavioralEpochs(name="Stimulus Image Epochs")
 
 # Loop through stimuli, creating sequences and adding them
 for cur_stim_ind, cur_stim_info in enumerate(stim_info):
-    print("Creating interval time series of on/off for stimulus %s" % cur_stim_info['name'])
-    cur_stim_series = IntervalSeries(cur_stim_info['name'], description='Epochs of when stimulus %s was on screen. This is extracted from trial information.' % (cur_stim_info['name']))
-
     # Let's find the on time for each stimulus
-    print("\tFinding onset and offset times...")
-    stim_events_df = uber_df.query("GatingCondSpecialized==%s and StageStimCategory==%s and StageStimDelayCategory==%s" %
-                                     (cur_stim_info['GatingCondSpecialized'], cur_stim_info['StageStimCategory'], cur_stim_info['StageStimDelayCategory']))
+    print("Finding onset and offset times for '%s'..." % (cur_stim_info['name']))
+    query_str = ""
+    key_list = np.setdiff1d([*cur_stim_info], ['name']).tolist()
+    for cur_key in key_list:
+        if len(cur_stim_info[cur_key]) > 0:
+            if query_str != '':
+                query_str += ' and '
+            query_str = query_str + "%s==%s" % (cur_key, cur_stim_info[cur_key])
+    stim_events_df = uber_df.query(query_str)
 
-    # Add each to the interval series
-    print("\tAdding intervals to series...")
-    stim_events_df = stim_events_df[['StageTimeIndex', 'StageDuration']].to_numpy()
-    for i, val in stim_events_df:
-        if np.isnan(val).any():
-            continue  # if either are NaN, then skip
-        cur_stim_series.add_interval(val[0]/sig_samp_freq,  (val[0] + val[1])/sig_samp_freq)
+    if stim_events_df.empty:
+        warnings.warn("\tDidn't find any instances of '%s'. This may be expected, but throwing a warning anyways and skipping." % (cur_stim_info['name']), UserWarning)
+        continue
+
+    # Get onset and durations
+    stim_events_time = stim_events_df[['StageTimeIndex', 'StageDuration']].to_numpy()
+    # Convert durations to offsets
+    stim_events_time[:, 1] = stim_events_time[:, 0] + stim_events_time[:, 1]
+
+    # Create the onset/offset data matrix
+    stim_events_data = np.zeros(stim_events_time.shape, dtype=int)
+    stim_events_data[:, 0] = 1
+    stim_events_data[:, 1] = -1
+
+    # Flatten both time and data
+    stim_events_time = stim_events_time.flatten()
+    stim_events_data = stim_events_data.flatten()
+
+    # Create interval series
+    print("\tCreating interval time series...")
+    cur_stim_series = IntervalSeries(name=cur_stim_info['name'],
+                                     description='Epochs of when stimulus %s was on screen. This is extracted from trial information.' % (
+                                     cur_stim_info['name']),
+                                     data=stim_events_data,
+                                     timestamps=stim_events_time)
 
     # Add to interface
     print("\tAdding signal to interface...")
@@ -292,7 +337,7 @@ nwb_io.close()
 ###
 #######################
 ## Do wavelet transformation of the raw Add stimulus epochs to file -- will track when something is on screen
-# Open NWB file for last additions
+# This will create a shallow copy of the file so the original remains untouched with analysis
 NWBAnalysisFunctions.NWBWaveletTransform(nwb_file_name,
                                          signal_name=None,
                                          freq=np.concatenate((np.arange(1,5,1), np.arange(6,18,2), np.arange(18,40,4), np.arange(40,100,8))),
@@ -300,4 +345,5 @@ NWBAnalysisFunctions.NWBWaveletTransform(nwb_file_name,
                                          elec_ids=None,
                                          wavelet_type='morlet',
                                          downsample=2,
+                                         copy_file=True,
                                          verbose=True)

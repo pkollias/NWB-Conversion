@@ -130,9 +130,14 @@ def AddTrialDataToNWB(nwb_file, trial_data, trial_descriptions=None, verbose=Fal
     if type(trial_data) is not list:
         raise ValueError("Trial data should be in the format of a list of dictionaries.")
 
-    # Get list of keys from trial_info and make sure they are NWB columns
+    # Process keys in input
     for cur_key in trial_data[0].keys():
-        if not(nwb_file.trials) or (cur_key not in nwb_file.trials.colnames):
+        # Don't process the start and stop times
+        if (cur_key == 'start_time') or (cur_key == 'stop_time'):
+            continue
+
+        # Create NWB columns if necessary
+        if (nwb_file.trials is None) or (cur_key not in nwb_file.trials.colnames):
             #Check to see if description of column was provided
             if cur_key in trial_descriptions.keys():
                 cur_key_desc = trial_descriptions[cur_key]
@@ -141,6 +146,30 @@ def AddTrialDataToNWB(nwb_file, trial_data, trial_descriptions=None, verbose=Fal
             # Add column to NWB file
             if verbose: print("Adding column %s to trial table. Description: %s" % (cur_key, cur_key_desc))
             nwb_file.add_trial_column(name=cur_key, description=cur_key_desc)
+
+        # Process inputs to make sure they are all the same length and also check if we have to handle strings
+        max_len = 0
+        data_is_str = False
+        f_vect_is_str = np.vectorize(lambda x: isinstance(x, str))
+        for cur_trial in trial_data:
+            if hasattr(cur_trial[cur_key], '__iter__'):
+                max_len = np.max((max_len, len(cur_trial[cur_key])))
+            else:
+                max_len = np.max((max_len, 1))
+            data_is_str = data_is_str or np.any(f_vect_is_str(np.array(cur_trial[cur_key])))
+
+        for cur_trial in trial_data:
+            if data_is_str:
+                # We have to serialize strings for NWB to handle them.  Seems to have issues with arrays of strings.
+                temp_data = ''
+                for cur_val_ind, cur_val in enumerate(cur_trial[cur_key]):
+                    temp_data = temp_data + str(cur_val) + ';'
+                cur_trial[cur_key] = temp_data
+            elif (max_len > 1):
+                temp_data = np.full((max_len,), -99, dtype=type(cur_trial[cur_key][0]))
+                temp_data[0:len(cur_trial[cur_key])] = cur_trial[cur_key]
+                cur_trial[cur_key] = temp_data
+
 
     # Loop through trials, adding each one
     if verbose: print("Adding trial data to NWB file.")
