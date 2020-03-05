@@ -488,7 +488,7 @@ def AddBlackrockLFPDataToNWB(blk_file_name, nwb_file_name='', verbose=False, ele
     return nwb_file_name
 
 
-def AddBlackrockSpikeDataToNWB(blk_nev_file_name, nwb_file_name='', elec_ids=None, verbose=False, add_units=False,
+def AddBlackrockSpikeDataToNWB(blk_nev_file_name, nwb_file_name='', nwb_file=None, elec_ids=None, verbose=False, add_units=False,
                                unit_info=None):
     """
         Copies filtered LFP data from the specified Blackrock file to Neurodata Without Borders (NWB) file.
@@ -514,11 +514,6 @@ def AddBlackrockSpikeDataToNWB(blk_nev_file_name, nwb_file_name='', elec_ids=Non
                                                         "Blackrock Event Data File (*.nev)")
         blk_nev_file_name = blk_nev_file_name[0]
 
-    # Check to see if valid nwb_file_name is passed
-    if not nwb_file_name:
-        nwb_file_name = path.splitext(blk_nev_file_name)[0] + '.nwb'
-    if verbose: print("Writing to NWB data file %s" % (nwb_file_name))
-
     # Initialize the Blackrock file
     try:
         # Requires the raw data to be imported
@@ -527,25 +522,32 @@ def AddBlackrockSpikeDataToNWB(blk_nev_file_name, nwb_file_name='', elec_ids=Non
         e = sys.exc_info()[0]
         raise FileNotFoundError("Couldn't open Blackrock file. Error: %s" % e)
 
-    # Initialize the NWB file
-    nwb_io = []
-    try:
-        if not path.isfile(nwb_file_name):
-            # Initialize NWB file
-            if verbose: print("NWB file doesn't exist. Creating new one: %s..." % (nwb_file_name))
-            InitializeNWBFromBlackrock(blk_nev_file_name, nwb_file_name, verbose=True)
+    # Check to see if an open NWB file was passed, if so use that
+    nwb_io = None
+    if nwb_file == None:
+        # Check to see if valid nwb_file_name is passed
+        if not nwb_file_name:
+            nwb_file_name = path.splitext(blk_nev_file_name)[0] + '.nwb'
+        if verbose: print("Writing to NWB data file %s" % (nwb_file_name))
 
-        # Append to existing file
-        if verbose: print("Opening NWB file %s..." % (nwb_file_name), end='')
-        nwb_file_append = True
-        nwb_io = NWBHDF5IO(nwb_file_name, mode='a')
-        nwb_file = nwb_io.read()
-        if verbose: print("done.")
-    except:  # catch *all* exceptions
-        e = sys.exc_info()[0]
-        if nwb_io: nwb_io.close()
-        nev_file.datafile.close()
-        raise FileExistsError("Couldn't open NWB file. Error: %s" % e)
+        # Initialize the NWB file
+        try:
+            if not path.isfile(nwb_file_name):
+                # Initialize NWB file
+                if verbose: print("NWB file doesn't exist. Creating new one: %s..." % (nwb_file_name))
+                InitializeNWBFromBlackrock(blk_nev_file_name, nwb_file_name, verbose=True)
+
+            # Append to existing file
+            if verbose: print("Opening NWB file %s..." % (nwb_file_name), end='')
+            nwb_file_append = True
+            nwb_io = NWBHDF5IO(nwb_file_name, mode='a')
+            nwb_file = nwb_io.read()
+            if verbose: print("done.")
+        except:  # catch *all* exceptions
+            e = sys.exc_info()[0]
+            if nwb_io: nwb_io.close()
+            nev_file.datafile.close()
+            raise FileExistsError("Couldn't open NWB file. Error: %s" % e)
 
     # Validate the elec_ids list
     if not elec_ids:
@@ -691,15 +693,18 @@ def AddBlackrockSpikeDataToNWB(blk_nev_file_name, nwb_file_name='', elec_ids=Non
                                   UserComment=cur_unit_info['UserComment'])
                 if verbose: print("\t\tAdded class %s." % (cur_class))
 
-    # Write the file
-    if verbose: print("\tWriting NWB file and closing.")
-    nwb_io.write(nwb_file)
-    nwb_io.close()
-
     # Close the nev file
     nev_file.datafile.close()
 
-    return nwb_file_name
+    # Did we open a file?  Then close it...
+    if nwb_io != None:
+        # Write the file
+        if verbose: print("\tWriting NWB file and closing.")
+        nwb_io.write(nwb_file)
+        nwb_io.close()
+        return nwb_file_name
+    else:
+        return nwb_file
 
 
 def AddBlackrockAnalogDataToNWB(blk_file_name, nwb_file_name='', signal_info=None, module_name='behavior',
@@ -1211,8 +1216,7 @@ def ConvertBlackrockEphysToNWB(blk_file_name, nwb_file_name='', verbose=False, e
                 "Couldn't process electrode inputs. Must provide IDs for all electrodes or pass empty array.")
         # If filtering is not provided, add it from NSX file
         if ('filtering' not in cur_elec_info.keys()) or (not cur_elec_info['filtering']):
-            electrode_info[cur_elec_info_ind][
-                'filtering'] = 'High Pass: %s (%d pole, %s), Low Pass: %s (%d pole, %s)' % (
+            electrode_info[cur_elec_info_ind]['filtering'] = 'High Pass: %s (%d pole, %s), Low Pass: %s (%d pole, %s)' % (
             nsx_file.extended_headers[0]['HighFreqCorner'], nsx_file.extended_headers[0]['HighFreqOrder'],
             nsx_file.extended_headers[0]['HighFreqType'], nsx_file.extended_headers[0]['LowFreqCorner'],
             nsx_file.extended_headers[0]['LowFreqOrder'], nsx_file.extended_headers[0]['LowFreqType'])

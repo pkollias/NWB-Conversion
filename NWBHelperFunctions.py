@@ -36,6 +36,23 @@ def OpenNWBFile(nwb_file_name, mode='a', verbose=False):
 
     return nwb_file, nwb_io
 
+def CloseNWBFile(nwb_file, nwb_io, verbose=False):
+    """
+        Closes a Neurodata Without Borders (NWB) file.
+
+        Usage: CloseNWBFile(nwb_file, nwb_io)
+
+        :param nwb_file: {NWBFile} NWB file.
+        :param nwb_io: {NWBHDF5IO} File handle for writing NWB file.
+        :param verbose: [optional] {bool} whether to print updates while converting. Default is false.
+            """
+
+    # Write to file and close
+    if verbose: print("Writing NWB file and closing.")
+    nwb_io.write(nwb_file)
+    nwb_io.close()
+
+
 def AddStimulusImageToNWB(nwb_file, image_info, verbose=False):
     """
         Adds stimulus images to Neurodata Without Borders (NWB) file.

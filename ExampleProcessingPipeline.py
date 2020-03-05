@@ -51,7 +51,7 @@ electrode_info.append({'id': 1, #TODO: This is the channel number
                        'location': 'PFC', # TODO: region assignment
                        'group': None, # TODO: This should reference the above group -- use the name of the electrode group for readability
                        'filtering': ''}),  # TODO: Probably don't need to include filtering, as this is all in the Blackrock file
-electrode_info.append({'id': 2, 'x': 0.0, 'y': 0.0, 'z': 0.0, 'impedance': float(-1), 'location': 'PFC', 'group': None, 'filtering': ''})
+electrode_info.append({'id': 3, 'x': 0.0, 'y': 0.0, 'z': 0.0, 'impedance': float(-1), 'location': 'PFC', 'group': None, 'filtering': ''})
 
 # Initialize NWB file with information
 nwb_file_name = ConvertBlackrockToNWB.InitializeNWBFromBlackrock(blk_file_name, '',
@@ -79,13 +79,13 @@ NWBHelperFunctions.AddStimulusImageToNWB(nwb_file_name, stimulus_image_info, ver
 
 #######################
 ## Add raw electrophysiology data
-ConvertBlackrockToNWB.AddBlackrockRawDataToNWB(blk_file_name, nwb_file_name, elec_ids=[1, 2])
+ConvertBlackrockToNWB.AddBlackrockRawDataToNWB(blk_file_name, nwb_file_name, elec_ids=[1])
 
 
 #######################
 ## Add processed LFP data
 blk_lfp_file_name = path.splitext(blk_file_name)[0] + '.ns3'
-ConvertBlackrockToNWB.AddBlackrockLFPDataToNWB(blk_lfp_file_name, nwb_file_name, elec_ids=[1,2], verbose=True)
+ConvertBlackrockToNWB.AddBlackrockLFPDataToNWB(blk_lfp_file_name, nwb_file_name, elec_ids=[1], verbose=True)
 
 
 #######################
@@ -108,11 +108,17 @@ for unit_ind, unit_row in units_df.iterrows():
                       'unit': unit_row['UnitNum'],
                       'UserRating': unit_row['RatingCode'],
                       'UserComment': unit_row['RatingComment']})
+
+#Open file before adding spiking data to avoid bug in NWB format
+nwb_file, nwb_io = NWBHelperFunctions.OpenNWBFile(nwb_file_name)
+
 # Loop through electrodes, adding units from each Plexon file
 for cur_elec in elec_list:
     plx_file_name = "%s_chan%03d.plx" % (path.splitext(blk_file_name)[0], cur_elec)
-    ConvertPlexonToNWB.AddPlexonSpikeDataToNWB(plx_file_name, nwb_file_name, elec_ids=[cur_elec], add_units=True, unit_info=unit_info, verbose=True)
+    ConvertPlexonToNWB.AddPlexonSpikeDataToNWB(plx_file_name, nwb_file=nwb_file, elec_ids=[cur_elec], add_units=True, unit_info=unit_info, verbose=True)
 
+# Write file and close
+NWBHelperFunctions.CloseNWBFile(nwb_file, nwb_io)
 
 #######################
 ## Add eye signals
@@ -331,8 +337,7 @@ nwb_file.processing['behavior'].add(stim_epoch_interface)
 
 # Write to file and close
 print("Writing NWB file and closing.")
-nwb_io.write(nwb_file)
-nwb_io.close()
+NWBHelperFunctions.CloseNWBFile(nwb_file, nwb_io)
 
 ###
 #######################

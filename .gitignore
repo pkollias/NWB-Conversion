@@ -1,6 +1,7 @@
 .idea/*
 __pycache__/*
 env/*
+venv/*
 Example Data/*
 PLX SDK/*
 PyPL2/*
@@ -17,3 +18,4 @@ example_save_subset_nsx.py
 pynwb/
 scrap_code.py
 test.py
+/Gating/

@@ -12,7 +12,7 @@ from pynwb.ecephys import SpikeEventSeries, EventWaveform
 import neo  # this has code for reading Plexon files
 
 
-def AddPlexonSpikeDataToNWB(plx_file_name, nwb_file_name='', elec_ids=None, verbose=False, add_units=False, unit_info=None):
+def AddPlexonSpikeDataToNWB(plx_file_name, nwb_file_name='', nwb_file=None, elec_ids=None, verbose=False, add_units=False, unit_info=None):
     """
         Copies filtered LFP data from the specified Blackrock file to Neurodata Without Borders (NWB) file.
         User must specify the file with the LFP data (at desired sampling rate and with desired filtering).
@@ -37,10 +37,32 @@ def AddPlexonSpikeDataToNWB(plx_file_name, nwb_file_name='', elec_ids=None, verb
         plx_file_name = QFileDialog.getOpenFileName(QFileDialog(), "Select File", getcwd(), "Plexon Data File (*.plx)")
         plx_file_name = plx_file_name[0]
 
-    # Check to see if valid nwb_file_name is passed
-    if not nwb_file_name:
-        nwb_file_name = path.splitext(plx_file_name)[0] + '.nwb'
-    if verbose: print("Writing to NWB data file %s" % (nwb_file_name))
+    # Check to see if an open NWB file was passed, if so use that
+    nwb_io = None
+    if nwb_file == None:
+        # Check to see if valid nwb_file_name is passed
+        if not nwb_file_name:
+            nwb_file_name = path.splitext(plx_file_name)[0] + '.nwb'
+        if verbose: print("Writing to NWB data file %s" % (nwb_file_name))
+
+        # Initialize the NWB file
+        try:
+            if not path.isfile(nwb_file_name):
+                # Initialize NWB file
+                if verbose: print("NWB file doesn't exist. Creating new one: %s..." % (nwb_file_name))
+                raise ValueError("NWB file doesn't exist.")
+                # InitializeNWBFromPlexon(plx_file_name, nwb_file_name, verbose=verbose) # TODO: write other functions for Plexon
+
+            # Append to existing file
+            if verbose: print("Opening NWB file %s..." % (nwb_file_name), end='')
+            nwb_file_append = True
+            nwb_io = NWBHDF5IO(nwb_file_name, mode='a')
+            nwb_file = nwb_io.read()
+            if verbose: print("done.")
+        except:  # catch *all* exceptions
+            e = sys.exc_info()[0]
+            if nwb_io: nwb_io.close()
+            raise FileExistsError("Couldn't open NWB file. Error: %s" % e)
 
     # Read in data from Plexon file
     try:
@@ -50,26 +72,6 @@ def AddPlexonSpikeDataToNWB(plx_file_name, nwb_file_name='', elec_ids=None, verb
     except:  # catch *all* exceptions
         e = sys.exc_info()[0]
         raise FileNotFoundError("Couldn't open Plexon file. Error: %s" % e)
-
-    # Initialize the NWB file
-    nwb_io = []
-    try:
-        if not path.isfile(nwb_file_name):
-            # Initialize NWB file
-            if verbose: print("NWB file doesn't exist. Creating new one: %s..." % (nwb_file_name))
-            raise ValueError("NWB file doesn't exist.")
-            #InitializeNWBFromPlexon(plx_file_name, nwb_file_name, verbose=verbose) # TODO: write other functions for Plexon
-
-        # Append to existing file
-        if verbose: print("Opening NWB file %s..." % (nwb_file_name), end='')
-        nwb_file_append = True
-        nwb_io = NWBHDF5IO(nwb_file_name, mode='a')
-        nwb_file = nwb_io.read()
-        if verbose: print("done.")
-    except:  # catch *all* exceptions
-        e = sys.exc_info()[0]
-        if nwb_io: nwb_io.close()
-        raise FileExistsError("Couldn't open NWB file. Error: %s" % e)
 
     # Validate the elec_ids list
     if not elec_ids:
@@ -95,8 +97,9 @@ def AddPlexonSpikeDataToNWB(plx_file_name, nwb_file_name='', elec_ids=None, verb
     if verbose: print("Writing spike waveforms data to NWB.")
     for cur_elec_ind, cur_elec in enumerate(elec_ids):
         # Find indices in the extended header information
-        cur_chan_ind = plx_file.channel_id_to_index([cur_elec])
-        if not cur_chan_ind:
+        try:
+            cur_chan_ind = plx_file.channel_id_to_index([cur_elec])
+        except:  # catch *all* exceptions
             print("Couldn't find specified electrode %d in NSx file. Skipping." % (cur_elec))
             continue
         cur_chan_ind = cur_chan_ind[0]
@@ -113,7 +116,7 @@ def AddPlexonSpikeDataToNWB(plx_file_name, nwb_file_name='', elec_ids=None, verb
         # Find units from this electrode
         unit_index_list = []
         for i, cur_unit_channel in enumerate(plx_file.header['unit_channels']):
-            if cur_unit_channel[0] == plx_file.header['signal_channels'][cur_chan_ind][0][0]:
+            if cur_unit_channel[0] == plx_file.header['signal_channels'][cur_chan_ind][0]:
                 unit_index_list.append(i)
         if not unit_index_list:
             print("\tCan't find any units associated with electrode %d." % (cur_elec))
@@ -165,19 +168,20 @@ def AddPlexonSpikeDataToNWB(plx_file_name, nwb_file_name='', elec_ids=None, verb
             # Get list of units for this electrode
             unit_index_list = []
             for i, cur_unit_channel in enumerate(plx_file.header['unit_channels']):
-                if cur_unit_channel[0] == plx_file.header['signal_channels'][cur_chan_ind][0][0]:
-                    unit_index_list.append(i)
+                if cur_unit_channel[0] == plx_file.header['signal_channels'][cur_chan_ind][0]:
+                    unit_num = int(cur_unit_channel[1].split('#')[-1])
+                    unit_index_list.append(unit_num)
             if not unit_index_list:
                 print("\tCan't find any units associated with electrode %d." % (cur_elec))
                 continue
             if verbose: print("\tElectrode %d, found %d unique units (%s)." % (cur_elec, len(unit_index_list), unit_index_list))
 
             # Loop through units
-            for cur_unit in unit_index_list:
+            for cur_unit_index, cur_unit in enumerate(unit_index_list):
                 #Get wf and ts for this unit
-                wf = plx_file.get_spike_raw_waveforms(unit_index=cur_unit)
+                wf = plx_file.get_spike_raw_waveforms(unit_index=cur_unit_index)
                 wf = wf.squeeze()
-                ts = plx_file.get_spike_timestamps(unit_index=cur_unit)
+                ts = plx_file.get_spike_timestamps(unit_index=cur_unit_index)
 
                 # Interval over which this unit was observed
                 obs_intervals = np.zeros((1,2))
@@ -188,8 +192,9 @@ def AddPlexonSpikeDataToNWB(plx_file_name, nwb_file_name='', elec_ids=None, verb
                 if not unit_info:
                     cur_unit_info = {'UserRating': -1, 'UserComment': ''}
                 else:
+                    unit_dict = {'electrode': cur_elec, 'unit': cur_unit}
                     i = 0
-                    while (i < len(unit_info)) and (unit_info[i]['electrode'] != cur_elec) and (unit_info[i]['unit'] != cur_unit):
+                    while (i < len(unit_info)) and not all(item in unit_info[i].items() for item in unit_dict.items()):
                         i = i + 1
                     if i >= len(unit_info):
                         cur_unit_info = {'UserRating': -1, 'UserComment': ''}
@@ -206,9 +211,12 @@ def AddPlexonSpikeDataToNWB(plx_file_name, nwb_file_name='', elec_ids=None, verb
                                   UserComment=cur_unit_info['UserComment'])
                 if verbose: print("\t\tAdded class %s." % (cur_unit))
 
-    # Write the file
-    if verbose: print("\tWriting NWB file and closing.")
-    nwb_io.write(nwb_file)
-    nwb_io.close()
-
-    return nwb_file_name
+    # Did we open a file?  Then close it...
+    if nwb_io != None:
+        # Write the file
+        if verbose: print("\tWriting NWB file and closing.")
+        nwb_io.write(nwb_file)
+        nwb_io.close()
+        return nwb_file_name
+    else:
+        return nwb_file
