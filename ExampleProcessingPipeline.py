@@ -2,7 +2,7 @@ import ConvertBlackrockToNWB
 import ConvertPlexonToNWB
 import NWBHelperFunctions
 import NWBAnalysisFunctions
-import sys
+# import sys
 import pandas
 from datetime import datetime
 import warnings
@@ -17,9 +17,9 @@ from Gating.rec import *
 def main():
 
     # init
-    args = sys.argv
-    fsroot = args[1]
-    sess_iloc = int(args[2])
+    # args = sys.argv
+    fsroot = '/Volumes'  # args[1]
+    sess_iloc = 27  # int(args[2])
     md = MetaData(fsroot)
     db = md.db_base_loader(['sessions', 'trials', 'events', 'units', 'conditions', 'activity'])
     sessions, trials, events, units, conditions, activity =\
@@ -80,6 +80,8 @@ def main():
                       for chan
                       in units_df['ChanNum'].unique()]
 
+    elec_list = units_df['ChanNum'].unique()
+
     # Initialize NWB file with information
     nwb_file_name = ConvertBlackrockToNWB.InitializeNWBFromBlackrock(blk_file_name, '',
                                                                      experiment=experiment,
@@ -107,13 +109,13 @@ def main():
 
     #######################
     ## Add raw electrophysiology data
-    ConvertBlackrockToNWB.AddBlackrockRawDataToNWB(blk_file_name, nwb_file_name, verbose=True, elec_ids=[1, 3]) ### pk
+    ConvertBlackrockToNWB.AddBlackrockRawDataToNWB(blk_file_name, nwb_file_name, verbose=True, elec_ids=elec_list)
 
 
     #######################
     ## Add processed LFP data
     blk_lfp_file_name = path.splitext(blk_file_name)[0] + '.ns3'
-    ConvertBlackrockToNWB.AddBlackrockLFPDataToNWB(blk_lfp_file_name, nwb_file_name, verbose=True, elec_ids=[1, 3])
+    ConvertBlackrockToNWB.AddBlackrockLFPDataToNWB(blk_lfp_file_name, nwb_file_name, verbose=True, elec_ids=elec_list)
 
 
     #######################
@@ -229,7 +231,7 @@ def main():
     sig_samp_freq = 30000
 
     # Combine the events and conditions dataframes into one UBERFRAME
-    uber_df = pandas.merge(events_df, conditions_df)
+    uber_df = pandas.merge(events_df.reset_index(drop=True), conditions_df.reset_index(drop=True))
 
     # The last stimulus doesn't have an offset, need to take it from the trials dataframe
     for cur_trial_ind, cur_trial in trials_df.iterrows():
@@ -360,15 +362,15 @@ def main():
     #######################
     ## Do wavelet transformation of the raw Add stimulus epochs to file -- will track when something is on screen
     # This will create a shallow copy of the file so the original remains untouched with analysis
-    NWBAnalysisFunctions.NWBWaveletTransform(nwb_file_name,
-                                             signal_name=None,
-                                             freq=np.concatenate((np.arange(1,5,1), np.arange(6,18,2), np.arange(18,40,4), np.arange(40,100,8))),
-                                             width=2.5,
-                                             elec_ids=None,
-                                             wavelet_type='morlet',
-                                             downsample=2,
-                                             copy_file=True,
-                                             verbose=True)
+    # NWBAnalysisFunctions.NWBWaveletTransform(nwb_file_name,
+    #                                          signal_name=None,
+    #                                          freq=np.concatenate((np.arange(1,5,1), np.arange(6,18,2), np.arange(18,40,4), np.arange(40,100,8))),
+    #                                          width=2.5,
+    #                                          elec_ids=None,
+    #                                          wavelet_type='morlet',
+    #                                          downsample=2,
+    #                                          copy_file=True,
+    #                                          verbose=True)
 
 
 main()
