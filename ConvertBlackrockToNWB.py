@@ -12,7 +12,7 @@ from pynwb.ecephys import ElectricalSeries, FilteredEphys, SpikeEventSeries, Eve
 from pynwb.behavior import BehavioralTimeSeries, EyeTracking, PupilTracking
 from pynwb.misc import AbstractFeatureSeries
 
-import brpylib
+from brPY import brpylib
 
 
 def InitializeNWBFromBlackrock(blk_file_name, nwb_file_name='', experiment=None, subject=None,
@@ -293,7 +293,7 @@ def AddBlackrockRawDataToNWB(blk_file_name, nwb_file_name='', verbose=False, ele
             elec_ids.append(head['ElectrodeID'])
 
     # Load data for all of the electrodes
-    if verbose: print("Loading raw data from NSx file...", end_str='')
+    if verbose: print("Loading raw data from NSx file...", end='')
     chan_data = nsx_file.getdata(elec_ids=elec_ids)
     if verbose: print("done.")
 

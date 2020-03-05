@@ -116,8 +116,9 @@ def AddPlexonSpikeDataToNWB(plx_file_name, nwb_file_name='', nwb_file=None, elec
         # Find units from this electrode
         unit_index_list = []
         for i, cur_unit_channel in enumerate(plx_file.header['unit_channels']):
+            ### ### ### if cur_unit_channel[0] == plx_file.header['signal_channels'][cur_chan_ind][0][0]:
             if cur_unit_channel[0] == plx_file.header['signal_channels'][cur_chan_ind][0]:
-                unit_index_list.append(i)
+                    unit_index_list.append(i)
         if not unit_index_list:
             print("\tCan't find any units associated with electrode %d." % (cur_elec))
             continue
@@ -168,6 +169,7 @@ def AddPlexonSpikeDataToNWB(plx_file_name, nwb_file_name='', nwb_file=None, elec
             # Get list of units for this electrode
             unit_index_list = []
             for i, cur_unit_channel in enumerate(plx_file.header['unit_channels']):
+                ### ### ### if cur_unit_channel[0] == plx_file.header['signal_channels'][cur_chan_ind][0][0]:
                 if cur_unit_channel[0] == plx_file.header['signal_channels'][cur_chan_ind][0]:
                     unit_num = int(cur_unit_channel[1].split('#')[-1])
                     unit_index_list.append(unit_num)
@@ -201,6 +203,8 @@ def AddPlexonSpikeDataToNWB(plx_file_name, nwb_file_name='', nwb_file=None, elec
                     else:
                         cur_unit_info = unit_info[i]
 
+                print(cur_unit_info)
+
                 # Add to NWB file
                 nwb_file.add_unit(spike_times=ts,
                                   obs_intervals=obs_intervals,
@@ -220,3 +224,5 @@ def AddPlexonSpikeDataToNWB(plx_file_name, nwb_file_name='', nwb_file=None, elec
         return nwb_file_name
     else:
         return nwb_file
+
+    return nwb_file_name
