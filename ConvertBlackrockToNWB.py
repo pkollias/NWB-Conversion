@@ -12,7 +12,7 @@ from pynwb.ecephys import ElectricalSeries, FilteredEphys, SpikeEventSeries, Eve
 from pynwb.behavior import BehavioralTimeSeries, EyeTracking, PupilTracking
 from pynwb.misc import AbstractFeatureSeries
 
-from brPY import brpylib
+import brpylib
 
 
 def InitializeNWBFromBlackrock(blk_file_name, nwb_file_name='', experiment=None, subject=None,
